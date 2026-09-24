@@ -173,9 +173,10 @@ async function callRead() {
   const args = parseArgs();
   if (args === null) return toast("参数不是合法 JSON", "err");
   const sender = wallets.length ? wallets[Number($("#callFrom").value || 0)].address : "0x0";
+  const value = parseFloat($("#callValue").value || 0);
   try {
     const d = await API.post(`/api/contract/${current}/call`,
-      { function: fn, args, sender });
+      { function: fn, args, sender, value });
     renderCallResult(d);
   } catch (e) { toast(e.message, "err"); }
 }

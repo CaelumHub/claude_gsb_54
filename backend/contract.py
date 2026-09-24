@@ -215,7 +215,19 @@ class ContractEngine:
 
     # -- simulate (read-only, no mutation) --------------------------------- #
     def simulate(self, contract_addr, function, args, sender, world_state,
-                 height=0):
+                 height=0, value=0):
         snapshot = world_state.copy()
-        return self.invoke(contract_addr, function, args, sender, 0,
+        value = float(value or 0)
+        # Mirror the on-chain pre-call transfer so msg.value / this_balance /
+        # transfer behave exactly like a real invocation.  All changes are
+        # discarded with the snapshot afterwards.
+        if value < 0:
+            return {"ok": False, "error": "attached value must be non-negative",
+                    "output": "", "events": [], "return": None, "transfers": []}
+        if snapshot.balance(sender) < value:
+            return {"ok": False, "error": "insufficient balance for call",
+                    "output": "", "events": [], "return": None, "transfers": []}
+        snapshot.add_balance(sender, -value)
+        snapshot.add_balance(contract_addr, value)
+        return self.invoke(contract_addr, function, args, sender, value,
                            snapshot, height)
