@@ -215,7 +215,19 @@ class ContractEngine:
 
     # -- simulate (read-only, no mutation) --------------------------------- #
     def simulate(self, contract_addr, function, args, sender, world_state,
-                 height=0):
+                 height=0, value=0):
         snapshot = world_state.copy()
-        return self.invoke(contract_addr, function, args, sender, 0,
+        value = float(value or 0)
+        # Mirror the on-chain value transfer (see
+        # ``Blockchain._execute_transaction``): the attached value is moved
+        # from sender to contract before invocation, so ``msg.value``,
+        # ``this_balance``/``balance_of`` and ``transfer`` see the same
+        # balances as a real call.  The snapshot keeps the live state intact.
+        if snapshot.balance(sender) < value:
+            return {"ok": False, "error": "insufficient balance for call",
+                    "output": "", "events": [], "return": None,
+                    "transfers": []}
+        snapshot.add_balance(sender, -value)
+        snapshot.add_balance(contract_addr, value)
+        return self.invoke(contract_addr, function, args, sender, value,
                            snapshot, height)
